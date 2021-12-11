@@ -1,0 +1,19 @@
+{
+  "name": "gems-game",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonaslocke/gems-game.git"
+  },
+  "author": "Jonas Antunes",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jonaslocke/gems-game/issues"
+  },
+  "homepage": "https://github.com/jonaslocke/gems-game#readme"
+}
