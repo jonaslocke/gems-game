@@ -22,37 +22,49 @@ class Board {
       .attr("height", this.size)
       .classed("board", true);
   }
-  drawGems(gameState, gemSize) {
+  drawGems(gameState) {
     this.anchor.selectAll("rect").remove();
-    let data = [];
     for (let index in gameState) {
       const gem = gameState[index];
-      const row = Math.floor(index / columns);
-      const column = index % columns;
-      const x = row * gemSize;
-      const y = column * gemSize;
-      gem.draw(game, { x, y });
+      gem.draw(game);
     }
   }
 }
 
 class Gem {
-  constructor({ color, size = 100 }) {
+  constructor({ color, size = 100, x, y }) {
     this.color = colors[color] ?? "#000000";
     this.size = size;
+    this.id = `gem-${Math.random().toString(36).substring(2, 5)}-${Math.random()
+      .toString(36)
+      .substring(2, 7)}-${Math.random().toString(36).substring(2, 5)}`;
+    this.x = x;
+    this.y = y;
   }
-  draw(anchor, { x, y }) {
+  draw(anchor) {
     const svg = anchor.select("svg");
     const rect = svg.append("rect");
     rect
-      .attr("x", x)
-      .attr("y", y)
+      .attr("x", this.x)
+      .attr("y", this.y)
       .attr("width", this.size)
       .attr("height", this.size)
       .attr("fill", this.color)
       .attr("stroke", "#000")
       .attr("stroke-width", 1)
-      .on("click", () => console.log(this.color));
+      .classed("gem", true)
+      .attr("id", this.id)
+      .on("click", () => this.move({ x: this.x + this.size }));
+  }
+
+  move({ x, y }) {
+    const gem = $(`#${this.id}`);
+    this.x = x ?? this.x;
+    this.y = y ?? this.y;
+    gem
+      .transition()
+      .attr("x", x ?? this.x)
+      .attr("y", y ?? this.y);
   }
 }
 
@@ -62,33 +74,27 @@ class State {
     this.columns = columns;
     this.gemSize = gemSize;
   }
-  fresh() {
-    return new Array(columns * columns).fill().map(() => {
+  fresh({ columns, gemSize }) {
+    return new Array(columns * columns).fill().map((_, id) => {
       const random = Math.floor(Math.random() * Object.keys(colors).length);
       const color = Object.keys(colors)[random];
       const size = gemSize;
-      return new Gem({ color, size });
+      const row = Math.floor(id / columns);
+      const column = id % columns;
+      const x = row * gemSize;
+      const y = column * gemSize;
+      return new Gem({ color, size, x, y });
     });
   }
 }
 
-const columns = 6;
-const gemSize = 60;
+const columns = 3;
+const gemSize = 100;
 
 const board = new Board({ size: columns * gemSize, anchor: game });
 
-const gameState = new State({ colors, columns, gemSize });
+const g = new State({ colors, columns, gemSize });
+const gameState = g.fresh({ columns, gemSize });
 
 board.init(game);
-board.drawGems(gameState.fresh(), gemSize);
-
-// for (let index in gameState) {
-//   const gem = gameState[index];
-//   const row = Math.floor(index / columns);
-//   const column = index % columns;
-//   const x = row * 100;
-//   const y = column * 100;
-//   gem.draw(board, { x, y });
-// }
-
-const x = new Gem({ color: "red" });
+board.drawGems(gameState, gemSize);
