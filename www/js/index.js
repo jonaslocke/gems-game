@@ -1,6 +1,6 @@
 const $ = (element) => d3.select(element);
 const $$ = (element) => d3.selectAll(element);
-const game = $("#game");
+const game_el = $("#game");
 const colors = {
   red: "#af002a",
   green: "#34b334",
@@ -11,44 +11,63 @@ const colors = {
 const columns = 6;
 const gemSize = 65;
 
+class Game {
+  constructor({ columns, gemSize, anchor }) {
+    this.columns = columns;
+    this.gemSize = gemSize;
+    this.colors = {
+      red: "#af002a",
+      green: "#34b334",
+      blue: "#00308f",
+      yellow: "#cccc33",
+      purple: "#431c53",
+    };
+    this.anchor = $(`#${anchor}`);
+  }
+  get stageSize() {
+    return Math.pow(this.columns, 2);
+  }
+  get boardSize() {
+    return this.columns * this.gemSize;
+  }
+}
+
+const game = new Game({ columns: 5, gemSize: 100, anchor: "game" });
+
 class Board {
-  constructor({ size, anchor, state }) {
-    this.size = size;
-    this.columns = Math.sqrt(state.length);
-    this.anchor = anchor;
+  constructor({ state, game }) {
     this.startGem = null;
     this.endGem = null;
     this.neighbohrs = {};
     this.state = state;
+    this.game = game;
   }
   init() {
-    this.anchor
+    this.game.anchor
       .append("svg")
-      .attr("viewBox", [0, 0, this.size, this.size])
-      .attr("width", this.size)
-      .attr("height", this.size)
+      .attr("viewBox", [0, 0, this.game.boardSize, this.game.boardSize])
+      .attr("width", this.game.boardSize)
+      .attr("height", this.game.boardSize)
       .classed("board", true);
   }
-  drawGems(gameState) {
-    this.anchor.selectAll("rect").remove();
-    for (let index in this.state) {
-      const gem = this.state[index];
-      gem.draw(game);
+  drawGems() {
+    this.game.anchor.selectAll("rect").remove();
+    for (let index in this.state.data) {
+      const gem = this.state.data[index];
+      gem.draw(this.anchor);
     }
     $$(".gem")
-      .data(this.state)
-      .on("click", (_, data) => {
+      .data(this.state.data)
+      .on("click", (_, gem) => {
         if (!this.startGem) {
-          this.startGem = data;
-          this.findNeighbors(this.state);
+          this.startGem = gem;
           this.selectGem();
         } else {
-          const gem = data;
-          const isNeighbour = Object.values(this.neighbohrs)
+          const isNeighbour = Object.values(this.neighbours)
             .filter((gem) => !!gem)
             .map(({ id }) => id)
             .includes(gem.id);
-          this.state.forEach((gem) => gem.reset());
+          this.state.data.forEach((gem) => gem.reset());
           if (isNeighbour) {
             this.endGem = gem;
             const horizontal = this.endGem.x - this.startGem.x;
@@ -80,39 +99,82 @@ class Board {
                 this.endGem.move.left();
                 break;
             }
+            console.log("neighbour =>", going);
           } else {
-            this.selectGem = null;
+            console.log("not neighbour");
+            this.startGem = null;
           }
-          gameState.update({ startGem: this.startGem, endGem: this.endGem });
+          console.log(this.state);
+          // this.state.update({ startGem: this.startGem, endGem: this.endGem });
           this.startGem = null;
           this.endGem = null;
         }
       });
   }
   selectGem() {
-    this.state.forEach((gem) => gem.reset());
+    this.state.data.forEach((gem) => gem.reset());
     this.startGem.highlight();
-    for (let neighbour in this.neighbohrs) {
-      const gem = this.neighbohrs[neighbour];
-      if (gem) gem.neighbour();
+    for (let neighbour in this.neighbours) {
+      const gem = this.neighbours[neighbour];
+      if (gem) {
+        gem.neighbour();
+      }
     }
   }
-  findNeighbors() {
-    const index = this.state.findIndex((gem) => gem.id == this.startGem.id);
-    const { row, column } = this.state[index];
-    this.neighbohrs = {
-      left: this.state[index - this.columns] || null,
-      top: row == 0 ? null : this.state[index - 1],
-      right: this.state[index + this.columns] || null,
-      bottom: row == this.columns - 1 ? null : this.state[index + 1],
+  get neighbours() {
+    const data = this.state.data;
+    const index = data.findIndex((gem) => gem.id == this.startGem.id);
+    const { row } = data[index];
+    return {
+      left: data[index - this.game.columns] || null,
+      top: row == 0 ? null : data[index - 1],
+      right: data[index + this.game.columns] || null,
+      bottom: row == this.game.columns - 1 ? null : data[index + 1],
     };
   }
 }
 
+class State {
+  constructor({ game }) {
+    this.game = game;
+    this.data = this._fresh();
+  }
+  _fresh() {
+    return new Array(this.game.columns * this.game.columns)
+      .fill()
+      .map((_, id) => {
+        const random = Math.floor(
+          Math.random() * Object.keys(this.game.colors).length
+        );
+        const color = Object.keys(this.game.colors)[random];
+        const size = this.game.gemSize;
+        const column = Math.floor(id / this.game.columns);
+        const row = id % this.game.columns;
+        const x = column * this.game.gemSize;
+        const y = row * this.game.gemSize;
+        return new Gem({
+          color,
+          size,
+          x,
+          y,
+          column,
+          row,
+          position: id,
+          game: this.game,
+        });
+      });
+  }
+  update({ startGem, endGem }) {
+    const start = new Gem({ ...startGem, position: endGem.position });
+    const end = new Gem({ ...endGem, position: startGem.position });
+    const x = this.data.map(({ id }) => id);
+  }
+}
+
 class Gem {
-  constructor({ color, size = 100, x, y, column, row, position }) {
-    this.color = colors[color] ?? "#000000";
-    this.size = size;
+  constructor({ color, x, y, column, row, position, game }) {
+    this.game = game;
+    this.color = game.colors[color] ?? "#000000";
     this.id = `gem-${Math.random().toString(36).substring(2, 5)}-${Math.random()
       .toString(36)
       .substring(2, 7)}-${Math.random().toString(36).substring(2, 5)}`;
@@ -121,21 +183,24 @@ class Gem {
     this.column = column;
     this.row = row;
     this.move = {
-      left: () => this._move({ x: this.x - this.size }),
-      up: () => this._move({ y: this.y - this.size }),
-      right: () => this._move({ x: this.x + this.size }),
-      down: () => this._move({ y: this.y + this.size }),
+      left: () => this._move({ x: this.x - this.game.gemSize }),
+      up: () => this._move({ y: this.y - this.game.gemSize }),
+      right: () => this._move({ x: this.x + this.game.gemSize }),
+      down: () => this._move({ y: this.y + this.game.gemSize }),
     };
     this.position = position;
   }
-  draw(anchor) {
-    const svg = anchor.select("svg");
+  get element() {
+    return $(`#${this.id}`);
+  }
+  draw() {
+    const svg = this.game.anchor.select("svg");
     const rect = svg.append("rect");
     rect
       .attr("x", this.x)
       .attr("y", this.y)
-      .attr("width", this.size)
-      .attr("height", this.size)
+      .attr("width", this.game.gemSize)
+      .attr("height", this.game.gemSize)
       .attr("fill", this.color)
       .attr("stroke", "#000")
       .attr("stroke-width", 0.5)
@@ -144,68 +209,36 @@ class Gem {
   }
 
   _move({ x, y }) {
-    const gem = $(`#${this.id}`);
     this.x = x ?? this.x;
     this.y = y ?? this.y;
-    gem
+    this.element
       .transition()
       .attr("x", x ?? this.x)
       .attr("y", y ?? this.y);
   }
   highlight() {
-    const gem = $(`#${this.id}`);
-    gem.attr("stroke-width", 4).raise();
+    this.element.attr("stroke-width", 4).raise();
   }
   neighbour() {
-    const gem = $(`#${this.id}`);
-    gem
+    this.element
       .attr("stroke", "#f535aa")
       .attr("stroke-dasharray", "4, 5")
       .attr("stroke-width", 3);
   }
   reset() {
-    const gem = $(`#${this.id}`);
-    gem
+    this.element
       .attr("stroke", "#000")
       .attr("stroke-width", 0.5)
       .attr("stroke-dasharray", "0,0");
   }
 }
 
-class State {
-  constructor({ colors, columns, gemSize }) {
-    this.colors = colors;
-    this.columns = columns;
-    this.gemSize = gemSize;
-    this.data = this._fresh();
-  }
-  _fresh() {
-    return new Array(this.columns * this.columns).fill().map((_, id) => {
-      const random = Math.floor(
-        Math.random() * Object.keys(this.colors).length
-      );
-      const color = Object.keys(this.colors)[random];
-      const size = gemSize;
-      const column = Math.floor(id / this.columns);
-      const row = id % this.columns;
-      const x = column * gemSize;
-      const y = row * gemSize;
-      return new Gem({ color, size, x, y, column, row, position: id });
-    });
-  }
-  update({ startGem, endGem }) {
-    const start = new Gem({ ...startGem, position: endGem.position });
-    const end = new Gem({ ...endGem, position: startGem.position });
-    const x = this.data.map(({ id }) => id);
-    console.log(x);
-  }
-}
-
-const state = new State({ colors, columns, gemSize });
+const state = new State({ game: game });
 const board = new Board({
   size: columns * gemSize,
-  anchor: game,
-  state: state.data,
+  anchor: game_el,
+  state: state,
+  game,
 });
 
 board.init(game);
