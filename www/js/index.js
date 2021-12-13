@@ -1,15 +1,5 @@
 const $ = (element) => d3.select(element);
 const $$ = (element) => d3.selectAll(element);
-const game_el = $("#game");
-const colors = {
-  red: "#af002a",
-  green: "#34b334",
-  blue: "#00308f",
-  yellow: "#cccc33",
-  purple: "#431c53",
-};
-const columns = 6;
-const gemSize = 65;
 
 class Game {
   constructor({ columns, gemSize, anchor }) {
@@ -104,8 +94,7 @@ class Board {
             console.log("not neighbour");
             this.startGem = null;
           }
-          console.log(this.state);
-          // this.state.update({ startGem: this.startGem, endGem: this.endGem });
+          this.state.update({ startGem: this.startGem, endGem: this.endGem });
           this.startGem = null;
           this.endGem = null;
         }
@@ -235,8 +224,6 @@ class Gem {
 
 const state = new State({ game: game });
 const board = new Board({
-  size: columns * gemSize,
-  anchor: game_el,
   state: state,
   game,
 });
